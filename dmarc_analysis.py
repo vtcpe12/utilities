@@ -5,7 +5,7 @@ import operator
 import json
 import argparse
 
-def parse_log (logfile):
+def parse_log (logfile,analyze_domain,analyze_specifics):
     quarantine_cnt = 0
     reject_cnt = 0
 
@@ -30,12 +30,23 @@ def parse_log (logfile):
             percent = fields[10].strip()
             policy = fields[11].strip()
 
-            try:
-                percent_dict[domain] = float(percent) / 100.0
-            except:
-                pass
+            include_in_analysis = False
+            if not analyze_domain and not analyze_specifics:
+                include_in_analysis = True
+            elif analyze_domain and analyze_specifics and domain == analyze_domain and fields[int(analyze_specifics[0])] == analyze_specifics[1]:
+                include_in_analysis = True
+            elif not analyze_specifics and analyze_domain and domain == analyze_domain:
+                include_in_analysis = True
+            elif not analyze_domain and analyze_specifics and fields[int(analyze_specifics[0])] == analyze_specifics[1]:
+                include_in_analysis = True
 
-            if requested_policy == "none":
+            if include_in_analysis:
+                try:
+                    percent_dict[domain] = float(percent) / 100.0
+                except:
+                    pass
+
+            if requested_policy == "none" and include_in_analysis:
                 in_none = domain in none_policy
                 count = none_policy[domain] if in_none else 0
                 none_policy[domain] = count + 1
@@ -44,7 +55,7 @@ def parse_log (logfile):
                     in_none = domain in none_dict
                     count = none_dict[domain] if in_none else 0
                     none_dict[domain] = count + 1
-            elif requested_policy == "quarantine":
+            elif requested_policy == "quarantine" and include_in_analysis:
                 in_quar = domain in quarantine_policy
                 count = quarantine_policy[domain] if in_quar else 0
                 quarantine_policy[domain] = count + 1
@@ -53,7 +64,7 @@ def parse_log (logfile):
                     in_quar = domain in quarantine_dict
                     count = quarantine_dict[domain] if in_quar else 0
                     quarantine_dict[domain] = count + 1
-            elif requested_policy == "reject":
+            elif requested_policy == "reject" and include_in_analysis:
                 in_reject = domain in reject_policy
                 count = reject_policy[domain] if in_reject else 0
                 reject_policy[domain] = count + 1
@@ -158,11 +169,13 @@ def generate_report(report_json):
 
 
 parser = argparse.ArgumentParser (description='Process command line flags')
-parser.add_argument('--file', '-f', dest='filename', nargs=1, help='Filename to process', required=True)
+parser.add_argument('--file', '-f', dest='filename', help='Filename to process', required=True)
 parser.add_argument('--report', '-r', action='store_true', help='Output a human readable report')
+parser.add_argument('--domain', '-d', dest='domain', help='Analyze a specific domain')
+parser.add_argument('--field', '-i', dest='field', nargs=2, default=list(), help='Analyze a specific field value [field value]')
 args = parser.parse_args()
 
-analysis = parse_log(args.filename[0])
+analysis = parse_log(args.filename,args.domain,args.field)
 
 if args.report:
     print generate_report(analysis)
